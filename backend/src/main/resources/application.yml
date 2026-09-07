@@ -1,0 +1,57 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: wms-backend
+  datasource:
+    # 默认使用内嵌 H2 文件库，零配置启动；生产使用 --spring.profiles.active=mysql
+    url: jdbc:h2:file:./data/wms;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      data-locations: classpath:data.sql
+      continue-on-error: true
+  h2:
+    console:
+      enabled: true
+      path: /h2
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+
+logging:
+  level:
+    com.wms: info
+
+---
+spring:
+  config:
+    activate:
+      on-profile: mysql
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:wms}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  sql:
+    init:
+      mode: always
+      continue-on-error: false
+  h2:
+    console:
+      enabled: false
