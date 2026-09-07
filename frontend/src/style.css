@@ -1,0 +1,9 @@
+html, body, #app { height: 100%; margin: 0; font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f5f7fa; }
+.page { padding: 16px; }
+.toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.toolbar .el-input, .toolbar .el-select { width: 200px; }
+.card { background: #fff; border-radius: 6px; padding: 16px; }
+.pager { display: flex; justify-content: flex-end; margin-top: 12px; }
+.stat { background: #fff; border-radius: 6px; padding: 16px; }
+.stat .label { color: #909399; font-size: 13px; }
+.stat .value { font-size: 28px; font-weight: 600; margin-top: 4px; }
