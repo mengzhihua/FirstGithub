@@ -8,6 +8,9 @@ import router from './router'
 import './style.css'
 
 const app = createApp(App)
+app.config.errorHandler = (err) => {
+  if (!(err && err.reported)) console.error(err)
+}
 Object.entries(Icons).forEach(([name, comp]) => app.component(name, comp))
 app.use(ElementPlus, { locale: zhCn })
 app.use(router)
