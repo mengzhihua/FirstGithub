@@ -55,7 +55,7 @@ DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=wms DB_USER=root DB_PASSWORD=xxx \
   mvn spring-boot:run -Dspring-boot.run.profiles=mysql
 ```
 
-启动时自动执行 `schema.sql` / `data.sql`（均为幂等语句）。
+`DB_USER` / `DB_PASSWORD` 必填（无默认值）。两种数据库启动时都会自动执行 `schema.sql` / `data.sql`（均为幂等语句，MySQL 建议库字符集 utf8mb4）。
 
 ### 冒烟测试
 

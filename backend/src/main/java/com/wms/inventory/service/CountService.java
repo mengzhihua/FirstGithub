@@ -115,7 +115,11 @@ public class CountService {
         }
         for (CountLine l : lines(orderId)) {
             if (l.getDiffQty() != null && l.getDiffQty().signum() != 0) {
-                inventoryService.adjust(l.getInventoryId(), l.getCountQty(), "盘点差异", order.getCode());
+                Inventory inv = inventoryMapper.selectById(l.getInventoryId());
+                if (inv == null) {
+                    throw new BizException("库存记录已不存在，请重新生成盘点单: " + l.getLocationCode() + " " + l.getItemCode());
+                }
+                inventoryService.adjust(inv.getId(), inv.getQty().add(l.getDiffQty()), "盘点差异", order.getCode());
             }
             l.setStatus("POSTED");
             lineMapper.updateById(l);

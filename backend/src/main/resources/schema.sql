@@ -122,10 +122,10 @@ CREATE TABLE IF NOT EXISTS wms_inventory (
   expiry_date DATE,
   ref_no VARCHAR(64) DEFAULT '',
   created_at TIMESTAMP,
-  updated_at TIMESTAMP
+  updated_at TIMESTAMP,
+  INDEX idx_inv_item (warehouse_code, owner_code, item_code),
+  INDEX idx_inv_loc (warehouse_code, location_code)
 );
-CREATE INDEX IF NOT EXISTS idx_inv_item ON wms_inventory (warehouse_code, owner_code, item_code);
-CREATE INDEX IF NOT EXISTS idx_inv_loc ON wms_inventory (warehouse_code, location_code);
 
 CREATE TABLE IF NOT EXISTS wms_inventory_txn (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,

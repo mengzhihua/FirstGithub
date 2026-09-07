@@ -1,6 +1,7 @@
 package com.wms.inventory.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.wms.basic.entity.Location;
 import com.wms.basic.mapper.LocationMapper;
 import com.wms.common.BizException;
@@ -60,6 +61,8 @@ public class InventoryService {
                 .eq(Inventory::getLotNo, lotNo)
                 .eq(Inventory::getRefNo, refNo == null ? "" : refNo)
                 .eq(Inventory::getStatus, AVAILABLE)
+                .eq(expiry != null, Inventory::getExpiryDate, expiry)
+                .isNull(expiry == null, Inventory::getExpiryDate)
                 .last("LIMIT 1"));
         if (inv == null) {
             inv = new Inventory();
@@ -79,9 +82,6 @@ public class InventoryService {
             inv.setQty(inv.getQty().add(qty));
             if (reserved != null) {
                 inv.setAllocatedQty(nz(inv.getAllocatedQty()).add(reserved));
-            }
-            if (inv.getExpiryDate() == null) {
-                inv.setExpiryDate(expiry);
             }
             inventoryMapper.updateById(inv);
         }
@@ -205,7 +205,8 @@ public class InventoryService {
         }
         List<Inventory> candidates = inventoryMapper.selectList(qw);
         List<Location> locs = locationMapper.selectList(new LambdaQueryWrapper<Location>()
-                .eq(Location::getWarehouseCode, warehouse).in(Location::getType, "STORAGE", "PICKING"));
+                .eq(Location::getWarehouseCode, warehouse).in(Location::getType, "STORAGE", "PICKING")
+                .eq(Location::getStatus, "AVAILABLE"));
         List<String> pickable = new ArrayList<>();
         locs.forEach(l -> pickable.add(l.getCode()));
         candidates.removeIf(c -> !pickable.contains(c.getLocationCode()) || c.getAvailableQty().signum() <= 0);
@@ -221,8 +222,15 @@ public class InventoryService {
                 break;
             }
             BigDecimal take = inv.getAvailableQty().min(remain);
-            inv.setAllocatedQty(nz(inv.getAllocatedQty()).add(take));
-            inventoryMapper.updateById(inv);
+            int updated = inventoryMapper.update(null, new LambdaUpdateWrapper<Inventory>()
+                    .eq(Inventory::getId, inv.getId())
+                    .eq(Inventory::getStatus, AVAILABLE)
+                    .apply("qty - allocated_qty >= {0}", take)
+                    .setSql("allocated_qty = allocated_qty + " + take.toPlainString()));
+            if (updated == 0) {
+                continue;
+            }
+            inv = inventoryMapper.selectById(inv.getId());
             txn("ALLOCATE", inv, inv.getLocationCode(), null, take, refNo, null);
             Allocation a = new Allocation();
             a.inventory = inv;
