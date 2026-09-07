@@ -26,7 +26,8 @@ export const menus = [
     path: '/outbound', name: '出库管理', icon: 'Upload',
     children: [
       { path: 'order', name: '出库单', component: () => import('../views/outbound/ShipOrder.vue') },
-      { path: 'pick', name: '拣货任务', component: () => import('../views/outbound/Pick.vue') }
+      { path: 'pick', name: '拣货任务', component: () => import('../views/outbound/Pick.vue') },
+      { path: 'wave', name: '波次/播种', component: () => import('../views/outbound/Wave.vue') }
     ]
   },
   {

@@ -14,6 +14,7 @@ import com.wms.inbound.mapper.AsnMapper;
 import com.wms.inbound.mapper.PutawayTaskMapper;
 import com.wms.inventory.entity.Inventory;
 import com.wms.inventory.service.InventoryService;
+import com.wms.outbound.service.CrossDockService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ public class AsnService {
     private final PutawayTaskMapper taskMapper;
     private final ItemMapper itemMapper;
     private final InventoryService inventoryService;
+    private final CrossDockService crossDockService;
     private final CodeGenerator codeGenerator;
 
     // ------------------------------------------------------------------ CRUD
@@ -48,6 +50,8 @@ public class AsnService {
         asn.setStatus("NEW");
         asn.setReceivedQty(BigDecimal.ZERO);
         asn.setPutawayQty(BigDecimal.ZERO);
+        asn.setCrossDockQty(BigDecimal.ZERO);
+        asn.setCrossDockOrderCode(blankToNull(asn.getCrossDockOrderCode()));
         asn.setTotalQty(asn.getLines().stream().map(AsnLine::getExpectedQty).reduce(BigDecimal.ZERO, BigDecimal::add));
         asnMapper.insert(asn);
         saveLines(asn);
@@ -68,6 +72,7 @@ public class AsnService {
         db.setExpectedDate(asn.getExpectedDate());
         db.setExternalNo(asn.getExternalNo());
         db.setRemark(asn.getRemark());
+        db.setCrossDockOrderCode(blankToNull(asn.getCrossDockOrderCode()));
         db.setTotalQty(asn.getLines().stream().map(AsnLine::getExpectedQty).reduce(BigDecimal.ZERO, BigDecimal::add));
         asnMapper.updateById(db);
         lineMapper.delete(new LambdaQueryWrapper<AsnLine>().eq(AsnLine::getAsnId, id));
@@ -146,6 +151,17 @@ public class AsnService {
                 line.setLotNo(lot);
             }
             lineMapper.updateById(line);
+            asn.setReceivedQty(nz(asn.getReceivedQty()).add(r.getQty()));
+
+            BigDecimal toPutaway = r.getQty();
+            if (asn.getCrossDockOrderCode() != null) {
+                BigDecimal xd = crossDockService.crossDock(asn.getCrossDockOrderCode(), inv, r.getQty(), asn.getCode());
+                asn.setCrossDockQty(nz(asn.getCrossDockQty()).add(xd));
+                toPutaway = toPutaway.subtract(xd);
+                if (toPutaway.signum() <= 0) {
+                    continue;
+                }
+            }
 
             PutawayTask task = new PutawayTask();
             task.setCode(codeGenerator.next("PA"));
@@ -160,11 +176,9 @@ public class AsnService {
             task.setFromLocation(loc);
             task.setSuggestLocation(inventoryService.suggestPutawayLocation(asn.getWarehouseCode(), asn.getOwnerCode(),
                     line.getItemCode(), lot, reservedByPendingTasks(asn.getWarehouseCode())));
-            task.setQty(r.getQty());
+            task.setQty(toPutaway);
             task.setStatus("NEW");
             taskMapper.insert(task);
-
-            asn.setReceivedQty(nz(asn.getReceivedQty()).add(r.getQty()));
         }
         boolean complete = load(asnId).getLines().stream()
                 .allMatch(l -> nz(l.getReceivedQty()).compareTo(l.getExpectedQty()) >= 0);
@@ -266,6 +280,9 @@ public class AsnService {
         if (asn.getWarehouseCode() == null || asn.getOwnerCode() == null) {
             throw new BizException("仓库和货主不能为空");
         }
+        if (blankToNull(asn.getCrossDockOrderCode()) != null) {
+            crossDockService.requireTarget(asn.getCrossDockOrderCode().trim(), asn.getWarehouseCode(), asn.getOwnerCode());
+        }
         if (asn.getLines() == null || asn.getLines().isEmpty()) {
             throw new BizException("入库单至少需要一行明细");
         }
@@ -302,6 +319,10 @@ public class AsnService {
             throw new BizException("入库单不存在");
         }
         return asn;
+    }
+
+    private static String blankToNull(String s) {
+        return s == null || s.trim().isEmpty() ? null : s.trim();
     }
 
     private static BigDecimal nz(BigDecimal v) {

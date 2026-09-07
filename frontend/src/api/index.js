@@ -43,6 +43,13 @@ export const outbound = {
   cancel: (id) => http.post(`/outbound/order/${id}/cancel`),
   tasks: (id) => http.get(`/outbound/order/${id}/tasks`),
   pickPage: (params) => http.get('/outbound/pick/page', { params }),
+  wavePage: (params) => http.get('/outbound/wave/page', { params }),
+  waveGet: (id) => http.get(`/outbound/wave/${id}`),
+  waveCreate: (data) => http.post('/outbound/wave', data),
+  wavePick: (taskId, qty) => http.post(`/outbound/wave/pick/${taskId}/confirm`, { qty }),
+  waveSow: (taskId, qty) => http.post(`/outbound/wave/sow/${taskId}/confirm`, { qty }),
+  waveShip: (id) => http.post(`/outbound/wave/${id}/ship`),
+  waveCancel: (id) => http.post(`/outbound/wave/${id}/cancel`),
   pick: (taskId, qty) => http.post(`/outbound/pick/${taskId}/confirm`, { qty })
 }
 

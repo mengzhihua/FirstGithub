@@ -38,7 +38,10 @@ const DICT = {
   PURCHASE: ['采购入库', 'primary'],
   RETURN: ['退货', 'warning'],
   TRANSFER: ['调拨', 'info'],
-  SALES: ['销售出库', 'primary']
+  SALES: ['销售出库', 'primary'],
+  CROSS_DOCK: ['越库', 'danger'],
+  SOWING: ['播种中', 'warning'],
+  SOWED: ['已播种', 'primary']
 }
 
 const props = defineProps({ value: String })

@@ -22,6 +22,7 @@
         <el-table-column prop="totalQty" label="预期数量" width="90" />
         <el-table-column prop="receivedQty" label="已收货" width="80" />
         <el-table-column prop="putawayQty" label="已上架" width="80" />
+        <el-table-column label="越库" width="150"><template #default="{ row }"><span v-if="row.crossDockOrderCode"><el-tag type="danger" size="small">越库</el-tag> {{ row.crossDockOrderCode }} ({{ row.crossDockQty || 0 }})</span></template></el-table-column>
         <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
         <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
@@ -49,6 +50,7 @@
         <el-form-item label="类型"><el-select v-model="form.type" style="width: 180px"><el-option label="采购入库" value="PURCHASE" /><el-option label="退货入库" value="RETURN" /><el-option label="调拨入库" value="TRANSFER" /></el-select></el-form-item>
         <el-form-item label="预计到货"><el-date-picker v-model="form.expectedDate" type="date" value-format="YYYY-MM-DD" style="width: 180px" /></el-form-item>
         <el-form-item label="外部单号"><el-input v-model="form.externalNo" style="width: 180px" /></el-form-item>
+        <el-form-item label="越库出库单"><el-input v-model="form.crossDockOrderCode" placeholder="填入出库单号后收货直接分拨" clearable style="width: 240px" /></el-form-item>
         <el-form-item label="备注"><el-input v-model="form.remark" style="width: 400px" /></el-form-item>
       </el-form>
       <el-divider content-position="left">明细</el-divider>
@@ -107,6 +109,8 @@
         <el-descriptions-item label="供应商">{{ current.supplierCode }}</el-descriptions-item>
         <el-descriptions-item label="预计到货">{{ current.expectedDate }}</el-descriptions-item>
         <el-descriptions-item label="外部单号">{{ current.externalNo }}</el-descriptions-item>
+        <el-descriptions-item label="越库出库单">{{ current.crossDockOrderCode || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="越库数量">{{ current.crossDockQty || 0 }}</el-descriptions-item>
       </el-descriptions>
       <h4>明细</h4>
       <el-table :data="current.lines || []" size="small" border>

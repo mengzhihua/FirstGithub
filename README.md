@@ -9,8 +9,8 @@
 | 模块 | 功能 |
 | --- | --- |
 | 基础数据 | 仓库、库区、库位（类型 / ABC / 拣货顺序 / 混放规则）、货主、物料（批次 / 效期 / 安全库存）、供应商、客户 |
-| 入库管理 | 入库通知单 ASN、按行收货（批次 / 效期 / 收货库位）、自动生成上架任务与推荐库位、上架确认、关闭收货 |
-| 出库管理 | 出库单、库存分配（FEFO → FIFO，仅存储/拣货位，支持部分分配）、取消分配、拣货任务确认（含少拣释放）、发运 |
+| 入库管理 | 入库通知单 ASN、按行收货（批次 / 效期 / 收货库位）、自动生成上架任务与推荐库位、上架确认、关闭收货、**越库（ASN 绑定出库单，收货直接分拨到发货暂存）** |
+| 出库管理 | 出库单、库存分配（FEFO → FIFO，仅存储/拣货位，支持部分分配）、取消分配、拣货任务确认（含少拣释放）、发运、**波次总拣 + 播种（多单合并拣货、按播种位分拨、波次发运）** |
 | 库内管理 | 库存查询、库存汇总、库存流水、移库、库存调整、冻结 / 解冻、盘点（生成快照 → 录入 → 差异 → 过账） |
 | 工作台 | 库位使用率、库存总量、待办入库 / 上架 / 出库 / 拣货、最近流水、安全库存预警 |
 
@@ -65,7 +65,9 @@ DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=wms DB_USER=root DB_PASSWORD=xxx \
 scripts/smoke.sh
 ```
 
-脚本依次完成：创建 ASN → 收货 → 上架 → 建出库单 → 分配（含部分分配）→ 拣货 → 发运 → 移库 / 冻结 / 调整 → 盘点过账，并输出库存汇总与流水统计。
+脚本依次完成：创建 ASN → 收货 → 上架 → 建出库单 → 分配（含部分分配）→ 拣货 → 发运 → 移库 / 冻结 / 调整 → 盘点过账 → 两单波次总拣 / 播种 / 波次发运 → 越库收货直发，并输出库存汇总与流水统计。
+
+> 注意：H2 默认使用 `./data/wms` 文件库，`schema.sql` 仅 `CREATE TABLE IF NOT EXISTS`；升级到含越库 / 波次的版本时请删除旧的 `backend/data` 目录（或在 MySQL 中手工补充 `wms_asn.cross_dock_*`、`wms_pick_task.wave_id` 及 `wms_wave*` / `wms_sow_task` 表）。
 
 ## API 概览
 
@@ -76,6 +78,7 @@ scripts/smoke.sh
 | 基础数据 | `GET/POST /api/basic/{warehouse,zone,location,owner,item,supplier,customer}` `/page` `/list` `/{id}` |
 | 入库 | `POST /api/inbound/asn`，`/{id}/receive`，`/{id}/close-receiving`，`/{id}/cancel`，`GET /{id}/tasks`；`GET /api/inbound/putaway/page`，`POST /{taskId}/confirm` |
 | 出库 | `POST /api/outbound/order`，`/{id}/allocate`，`/{id}/deallocate`，`/{id}/ship`，`/{id}/cancel`；`GET /api/outbound/pick/page`，`POST /{taskId}/confirm` |
+| 波次 | `GET /api/outbound/wave/page`，`/{id}`；`POST /api/outbound/wave`（orderIds），`/pick/{taskId}/confirm`（总拣，可少拣），`/sow/{taskId}/confirm`（播种，可分次），`/{id}/ship`，`/{id}/cancel` |
 | 库存 | `GET /api/inventory/page`，`/summary`，`/txn/page`；`POST /move`，`/adjust`，`/freeze` |
 | 盘点 | `POST /api/inventory/count`，`/{id}/submit`，`/{id}/post`，`/{id}/cancel`，`GET /{id}/lines` |
 | 工作台 | `GET /api/dashboard` |
@@ -87,4 +90,6 @@ scripts/smoke.sh
 - **上架推荐**：优先同货主同物料同批次的存储位 → 按拣货顺序的空库位 → 满足混放规则（`mixSku` / `mixLot`）的库位；已被其他待上架任务占用的库位视为已占用。
 - **分配**：FEFO（效期早优先）→ FIFO（收货早优先），使用 `allocatedQty` 预占；库存不足时状态为 `PART_ALLOCATED`，可再次分配。
 - **拣货**：库存从拣货位移入 `STAGING_OUT`；少拣部分自动释放预占。
+- **越库（Cross-Dock）**：ASN 填写 `crossDockOrderCode`（同仓同货主、未发运的出库单）后，收货时按物料 / 批次匹配出库单未分配需求，直接扣减收货暂存并写入 `STAGING_OUT`，生成已完成的 `XD` 拣货任务，出库单变为可发运；超出需求的数量仍走正常上架。
+- **波次 / 播种（Wave / Pick-to-Sort）**：选择同仓多张已分配出库单建波次，普通拣货任务按“库位 + 物料 + 批次”合并为总拣任务；总拣确认后数量按出库单优先级分摊到各单（少拣缺口自动释放），并按出库单生成带播种位的播种任务；全部播种完成后可整波发运。已入波次的任务不可在普通拣货页操作，出库单也不可取消分配，需先取消波次。
 - **盘点**：按仓库 / 库区生成账面快照，录入实盘后计算差异，过账时按差异写 `ADJUST` 流水。

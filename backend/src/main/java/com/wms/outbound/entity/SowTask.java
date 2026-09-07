@@ -7,26 +7,22 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("wms_pick_task")
-public class PickTask extends BaseEntity {
-    private String code;
+@TableName("wms_sow_task")
+public class SowTask extends BaseEntity {
+    private Long waveId;
+    private String waveCode;
     private Long orderId;
-    private Long orderLineId;
     private String orderCode;
-    private String warehouseCode;
+    /** 播种位(格口)序号 */
+    private Integer slotNo;
     private String ownerCode;
     private String itemCode;
     private String lotNo;
-    private Long inventoryId;
-    private String fromLocation;
-    private String toLocation;
     private BigDecimal qty;
-    private BigDecimal pickedQty;
+    private BigDecimal sowedQty;
     private String status;
-    private Long waveId;
 }

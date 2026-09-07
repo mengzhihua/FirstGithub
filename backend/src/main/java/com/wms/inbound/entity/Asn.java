@@ -26,6 +26,9 @@ public class Asn extends BaseEntity {
     private BigDecimal totalQty;
     private BigDecimal receivedQty;
     private BigDecimal putawayQty;
+    /** 越库: 收货后直接分拨到该出库单, 不上架 */
+    private String crossDockOrderCode;
+    private BigDecimal crossDockQty;
 
     @TableField(exist = false)
     private List<AsnLine> lines;

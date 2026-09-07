@@ -153,6 +153,11 @@ public class ShipOrderService {
             throw new BizException("仅已分配且未开始拣货的出库单可取消分配");
         }
         for (PickTask t : tasks(orderId)) {
+            if ("NEW".equals(t.getStatus()) && t.getWaveId() != null) {
+                throw new BizException("出库单已加入波次，请先取消波次");
+            }
+        }
+        for (PickTask t : tasks(orderId)) {
             if ("NEW".equals(t.getStatus())) {
                 inventoryService.release(t.getInventoryId(), t.getQty(), order.getCode());
                 t.setStatus("CANCELLED");
@@ -174,6 +179,16 @@ public class ShipOrderService {
     @Transactional
     public PickTask pick(Long taskId, BigDecimal qty) {
         PickTask task = taskMapper.selectById(taskId);
+        if (task != null && task.getWaveId() != null && "NEW".equals(task.getStatus())) {
+            throw new BizException("任务已加入波次，请在波次页面进行总拣");
+        }
+        return pick(taskId, qty, false);
+    }
+
+    /** {@code allowZero}: confirm a task with nothing picked (short pick), releasing its whole reservation. */
+    @Transactional
+    public PickTask pick(Long taskId, BigDecimal qty, boolean allowZero) {
+        PickTask task = taskMapper.selectById(taskId);
         if (task == null) {
             throw new BizException("拣货任务不存在");
         }
@@ -181,16 +196,18 @@ public class ShipOrderService {
             throw new BizException("任务已处理");
         }
         BigDecimal pickQty = qty == null ? task.getQty() : qty;
-        if (pickQty.signum() <= 0 || pickQty.compareTo(task.getQty()) > 0) {
+        if ((pickQty.signum() < 0 || (!allowZero && pickQty.signum() == 0)) || pickQty.compareTo(task.getQty()) > 0) {
             throw new BizException("拣货数量必须在 0 到 " + task.getQty() + " 之间");
         }
         ShipOrder order = require(task.getOrderId());
 
         // take from storage (release reservation) and park in the outbound staging, reserved for this order
-        Inventory src = inventoryMapper.selectById(task.getInventoryId());
-        inventoryService.deduct(task.getInventoryId(), pickQty, true, order.getCode(), "PICK");
-        inventoryService.add(task.getWarehouseCode(), task.getToLocation(), task.getOwnerCode(), task.getItemCode(),
-                task.getLotNo(), pickQty, src == null ? null : src.getExpiryDate(), order.getCode(), "STAGE", pickQty);
+        if (pickQty.signum() > 0) {
+            Inventory src = inventoryMapper.selectById(task.getInventoryId());
+            inventoryService.deduct(task.getInventoryId(), pickQty, true, order.getCode(), "PICK");
+            inventoryService.add(task.getWarehouseCode(), task.getToLocation(), task.getOwnerCode(), task.getItemCode(),
+                    task.getLotNo(), pickQty, src == null ? null : src.getExpiryDate(), order.getCode(), "STAGE", pickQty);
+        }
         BigDecimal shortQty = task.getQty().subtract(pickQty);
         if (shortQty.signum() > 0) {
             inventoryService.release(task.getInventoryId(), shortQty, order.getCode());
@@ -213,7 +230,11 @@ public class ShipOrderService {
         }
         long open = taskMapper.selectCount(new LambdaQueryWrapper<PickTask>()
                 .eq(PickTask::getOrderId, order.getId()).eq(PickTask::getStatus, "NEW"));
-        order.setStatus(open > 0 ? "PICKING" : "PICKED");
+        if (open > 0) {
+            order.setStatus("PICKING");
+        } else {
+            order.setStatus(nz(order.getPickedQty()).signum() > 0 ? "PICKED" : "PART_ALLOCATED");
+        }
         orderMapper.updateById(order);
         return task;
     }
