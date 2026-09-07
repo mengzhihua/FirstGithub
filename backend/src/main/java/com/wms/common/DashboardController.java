@@ -26,6 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/dashboard")
@@ -45,9 +47,11 @@ public class DashboardController {
     public R<Map<String, Object>> summary() {
         Map<String, Object> m = new HashMap<>();
         m.put("itemCount", itemMapper.selectCount(null));
-        long locTotal = locationMapper.selectCount(new LambdaQueryWrapper<Location>().eq(Location::getType, "STORAGE"));
+        Set<String> storageCodes = locationMapper.selectList(new LambdaQueryWrapper<Location>().eq(Location::getType, "STORAGE"))
+                .stream().map(Location::getCode).collect(Collectors.toSet());
+        long locTotal = storageCodes.size();
         List<Inventory> stock = inventoryMapper.selectList(new LambdaQueryWrapper<Inventory>().gt(Inventory::getQty, 0));
-        long used = stock.stream().map(Inventory::getLocationCode).distinct().count();
+        long used = stock.stream().map(Inventory::getLocationCode).filter(storageCodes::contains).distinct().count();
         m.put("locationTotal", locTotal);
         m.put("locationUsed", used);
         m.put("inventoryRecords", stock.size());
